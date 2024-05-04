@@ -1,1 +1,3 @@
-FindMergeConflict
+# FindMergeConflict
+
+一个Python程序，在Github的项目中找出代码合并冲突的场景
