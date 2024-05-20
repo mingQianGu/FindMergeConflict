@@ -5,7 +5,6 @@ import time
 
 from bs4 import BeautifulSoup
 import requests
-from tqdm import tqdm
 import progressbar
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
