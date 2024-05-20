@@ -5,12 +5,8 @@ import time
 
 from bs4 import BeautifulSoup
 import requests
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as ec
-from selenium.webdriver.chrome.options import Options
+from tqdm import tqdm
+import progressbar
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 from concurrent.futures import ThreadPoolExecutor
@@ -34,7 +30,7 @@ def find_merge_conflict(pull_url):
         response = retry_session().get(pull_url, headers=headers)
         pull = response.json()
         # print("Pull information:", pull)  # 添加调试语句，打印拉取请求的信息
-        print("Mergeable status:", pull.get("mergeable_state"))  # 添加调试语句，打印合并状态
+        # print("Mergeable status:", pull.get("mergeable_state"))  # 添加调试语句，打印合并状态
         mergeable = pull.get("mergeable_state", None)  # 从 pull 字典中获取 mergeable 字段的值
         if pull["mergeable_state"] == "dirty":
             return True
@@ -104,12 +100,13 @@ def process_pull_url(pull_url):
         parsed_url = urlparse(pull_url)
         repo_url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path.rsplit('/', 2)[0]}"
         with lock:
-            print(f"{pull_url}: have merge conflict!")
+            # print(f"{pull_url}: have merge conflict!")
             if merge_conflict_dict.get(repo_url) == None:
                 merge_conflict_dict[repo_url] = [pull_url]
             else:
                 merge_conflict_dict[repo_url].append(pull_url)
             conflict_num += 1
+            progress_bar.update(conflict_num)
 
 
 if __name__ == "__main__":
@@ -124,6 +121,10 @@ if __name__ == "__main__":
     lock = threading.Lock()
     thread_pool = ThreadPoolExecutor(max_workers=12)
 
+    # 进度条初始化
+    progress_bar = progressbar.ProgressBar(max_value=max_conflict_num)
+    progress_bar.update(conflict_num)
+
     while repo_num <= max_repo_num or conflict_num <= max_conflict_num:
         repo_urls = get_random_repositories(100)
         repo_num += len(repo_urls)
@@ -132,15 +133,18 @@ if __name__ == "__main__":
                 break
             pull_urls = get_pull_requests(repo_url)
             if pull_urls:
-                print(pull_urls)
+                # print(pull_urls)
                 # 创建线程
                 for pull_url in pull_urls:
                     if conflict_num >= max_conflict_num:
                         break
                     thread_pool.submit(process_pull_url, pull_url)
-            print("Repo num:", repo_num, "Conflict num:", conflict_num)  # 添加调试语句，打印 repo_num 和 conflict_num 的值
+            # print("Repo num:", repo_num, "Conflict num:", conflict_num)  # 添加调试语句，打印 repo_num 和 conflict_num 的值
+
+    thread_pool.shutdown(wait=True)
+    progress_bar.finish()
 
     for key, value in merge_conflict_dict.items():
         print(f"{key}: {value}")
 
-    thread_pool.shutdown(wait=True)
+
